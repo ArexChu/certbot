@@ -1,0 +1,74 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU (for ARM64)
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      - name: Set up Python (ARM64)
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+          architecture: arm64
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev libssl-dev python3-dev
+
+      - name: Install Python dependencies
+        run: |
+          cd certbot
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Build ARM64 executable
+        run: |
+          cd certbot
+          pyinstaller --onefile certbot.py --name certbot
+          ls dist/
+
+      - name: Upload ARM64 binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: certbot-arm64
+          path: certbot/dist/certbot
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download ARM64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: certbot-arm64
+          path: dist/
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ARM64 binary to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/certbot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
