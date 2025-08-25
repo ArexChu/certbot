@@ -1,0 +1,65 @@
+name: Build and Release Certbot ARM64 Binary
+
+on:
+  push:
+    tags:
+      - 'v*'  # 仅在打 tag 时触发
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create dist folder
+        run: mkdir -p dist
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev libssl-dev python3-dev python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel pyinstaller
+
+          # 安装 acme 源码
+          cd ${{ github.workspace }}/acme
+          python3 -m pip install --no-binary :all: .
+
+          # 安装 certbot 本地源码，不拉取 PyPI 依赖
+          cd ${{ github.workspace }}/certbot
+          python3 -m pip install --no-deps -e .
+
+      - name: Build ARM64 executable
+        run: |
+          cd ${{ github.workspace }}/certbot
+          # 使用 main.py 作为入口
+          pyinstaller --onefile src/certbot/main.py --name certbot
+          cp dist/certbot ${{ github.workspace }}/dist/
+
+      - name: List dist files
+        run: ls -lh dist
+
+      - name: Upload ARM64 binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: certbot-arm64
+          path: dist/certbot
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ARM64 binary to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/certbot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
