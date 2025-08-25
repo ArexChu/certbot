@@ -1,0 +1,56 @@
+name: Build and Release Certbot ARM64 Binary
+
+on:
+  push:
+    tags:
+      - 'v*'  # 仅在打 tag 时触发
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create dist folder
+        run: mkdir -p dist
+
+      - name: Build ARM64 executable inside Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+            --platform linux/arm64 \
+            python:3.11-slim \
+            bash -c "
+              apt-get update && apt-get install -y build-essential libffi-dev libssl-dev python3-dev &&
+              pip install --upgrade pip setuptools wheel pyinstaller &&
+              cd certbot &&
+              pyinstaller --onefile certbot.py --name certbot &&
+              cp dist/certbot /src/dist/
+            "
+
+      - name: List dist files
+        run: ls -lh dist
+
+      - name: Upload ARM64 binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: certbot-arm64
+          path: dist/certbot
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ARM64 binary to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/certbot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
