@@ -1,0 +1,38 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3.11 python3.11-dev python3.11-venv
+          python3.11 -m pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies from source
+        run: |
+          python3.11 -m pip install ./acme
+          python3.11 -m pip install ./certbot
+          python3.11 -m pip install pyinstaller
+
+      - name: Build Certbot executable
+        run: |
+          cd certbot
+          pyinstaller --onefile --name certbot src/certbot/main.py
+          ls -lh dist/
+
+      - name: Upload binary to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: certbot/dist/certbot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
