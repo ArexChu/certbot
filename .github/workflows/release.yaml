@@ -20,8 +20,11 @@ jobs:
 
       - name: Install dependencies from source
         run: |
+          python3.11 -m pip install --upgrade pip wheel
+          python3.11 -m pip install "setuptools<66"
           python3.11 -m pip install ./acme
           python3.11 -m pip install ./certbot
+          python3.11 -m pip install ./certbot-dns-cloudflare
           python3.11 -m pip install pyinstaller
 
       - name: Create minimal wrapper for PyInstaller
@@ -37,12 +40,17 @@ jobs:
       - name: Build Certbot executable
         run: |
           cd certbot
-          pyinstaller --onefile --name certbot --collect-all certbot run_certbot.py
+          pyinstaller --onefile \
+            --name certbot \
+            --collect-all certbot \
+            --collect-all certbot_dns_cloudflare \
+            run_certbot.py
           ls -lh dist/
 
       - name: Test binary
         run: |
           ./certbot/dist/certbot --version
+          ./certbot/dist/certbot plugins
 
       - name: Upload binary to Release
         uses: softprops/action-gh-release@v2
