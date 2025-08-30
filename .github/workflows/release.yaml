@@ -58,3 +58,59 @@ jobs:
           files: certbot/dist/certbot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  build-amd64:
+    runs-on: ubuntu-22.04
+    container: centos:7
+    steps:
+      - name: Install system dependencies
+        run: |
+          sed -i 's|mirrorlist=http://mirrorlist.centos.org|#mirrorlist=http://mirrorlist.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+          yum clean all
+          yum -y update
+          yum -y install epel-release
+          yum -y install python3 python3-devel python3-venv
+          python3 -m pip install --upgrade pip setuptools wheel
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies from source
+        run: |
+          python3 -m pip install "setuptools<66"
+          python3 -m pip install ./acme ./certbot ./certbot-dns-cloudflare
+          python3 -m pip install pyinstaller
+
+      - name: Create minimal wrapper for PyInstaller
+        run: |
+          cd certbot
+          cat > run_certbot.py << 'EOF'
+          from src.certbot.main import main
+          import sys
+          if __name__ == "__main__":
+              sys.exit(main())
+          EOF
+
+      - name: Build Certbot executable (amd64)
+        run: |
+          cd certbot
+          pyinstaller --onefile \
+            --name certbot-amd64 \
+            --collect-all certbot \
+            --collect-all certbot_dns_cloudflare \
+            run_certbot.py
+          ls -lh dist/
+
+      - name: Test binary
+        run: |
+          ./certbot/dist/certbot-amd64 --version
+          ./certbot/dist/certbot-amd64 plugins
+
+      - name: Upload binary (amd64)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: certbot/dist/certbot-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
