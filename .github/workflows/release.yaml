@@ -78,7 +78,7 @@ jobs:
           python3.11 -m pip install "setuptools<66"
           python3.11 -m pip install ./acme
           python3.11 -m pip install ./certbot
-          python3.11 -m pip install ./certbot-dns-cloudflare
+          python3.11 -m pip install ./certbot-nginx
           python3.11 -m pip install pyinstaller
 
       - name: Create minimal wrapper for PyInstaller
@@ -97,7 +97,7 @@ jobs:
           pyinstaller --onefile \
             --name certbot-amd64 \
             --collect-all certbot \
-            --collect-all certbot_dns_cloudflare \
+            --collect-all certbot_nginx \
             run_certbot.py
           ls -lh dist/
 
